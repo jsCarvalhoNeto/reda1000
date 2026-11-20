@@ -12,6 +12,9 @@ import {
   Loader2,
   BookOpenCheck,
   Type,
+  FolderHeart,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 
 export interface AnalyzePayload {
@@ -22,6 +25,8 @@ export interface AnalyzePayload {
 
 interface UploadPanelProps {
   apiConfigured: boolean;
+  userEmail: string | null;
+  onSignOut: () => Promise<void>;
   onAnalyze: (payload: AnalyzePayload) => Promise<void>;
   onLoadDemo: (demoKey: "sus840" | "pufendorf960") => void;
   isLoading: boolean;
@@ -32,6 +37,8 @@ type InputMode = "file" | "text";
 
 export function UploadPanel({
   apiConfigured,
+  userEmail,
+  onSignOut,
   onAnalyze,
   onLoadDemo,
   isLoading,
@@ -99,19 +106,50 @@ export function UploadPanel({
           </p>
         </div>
 
-        <Link
-          href="/configuracoes"
-          className="inline-flex items-center gap-2.5 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 shadow-xs transition hover:bg-stone-50"
-        >
-          <Settings className="h-4 w-4 text-emerald-800" />
-          <span>Configurações</span>
-          <span
-            className={`h-2 w-2 rounded-full ${
-              apiConfigured ? "bg-emerald-500" : "bg-amber-400"
-            }`}
-            title={apiConfigured ? "API Configurada" : "API não configurada"}
-          />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {userEmail ? (
+            <>
+              <Link
+                href="/relatorios"
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-800/20 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-900 shadow-2xs transition hover:bg-emerald-100"
+              >
+                <FolderHeart className="h-4 w-4" />
+                Meus Relatórios
+              </Link>
+              <button
+                type="button"
+                onClick={onSignOut}
+                title={`Logado como ${userEmail}`}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-stone-700 shadow-2xs transition hover:bg-stone-50"
+              >
+                <LogOut className="h-3.5 w-3.5 text-stone-500" />
+                Sair
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-xs font-semibold text-stone-800 shadow-2xs transition hover:bg-stone-50"
+            >
+              <LogIn className="h-4 w-4 text-emerald-800" />
+              Entrar / Criar Conta
+            </Link>
+          )}
+
+          <Link
+            href="/configuracoes"
+            className="inline-flex items-center gap-2.5 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 shadow-xs transition hover:bg-stone-50"
+          >
+            <Settings className="h-4 w-4 text-emerald-800" />
+            <span>Configurações</span>
+            <span
+              className={`h-2 w-2 rounded-full ${
+                apiConfigured ? "bg-emerald-500" : "bg-amber-400"
+              }`}
+              title={apiConfigured ? "API Configurada" : "API não configurada"}
+            />
+          </Link>
+        </div>
       </div>
 
       {/* Card Principal */}

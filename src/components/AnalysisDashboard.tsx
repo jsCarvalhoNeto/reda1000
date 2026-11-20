@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { EssayAnalysisResult, InterventionStatus } from "@/types/essay";
 import { EssayHighlighter } from "./EssayHighlighter";
 import { PrintableReport } from "./PrintableReport";
@@ -16,10 +17,15 @@ import {
   Layers,
   SpellCheck2,
   TrendingUp,
+  BookmarkPlus,
+  Loader2,
+  FolderHeart,
 } from "lucide-react";
 
 interface AnalysisDashboardProps {
   data: EssayAnalysisResult;
+  userEmail: string | null;
+  alreadySaved?: boolean;
   onReset: () => void;
 }
 
@@ -47,9 +53,39 @@ function StatusBadge({ status }: { status: InterventionStatus }) {
   );
 }
 
-export function AnalysisDashboard({ data, onReset }: AnalysisDashboardProps) {
+export function AnalysisDashboard({
+  data,
+  userEmail,
+  alreadySaved = false,
+  onReset,
+}: AnalysisDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("competencias");
   const [pdfTheme, setPdfTheme] = useState<"emerald" | "sepia">("emerald");
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(alreadySaved);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSaveReport = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/relatorios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ result: data }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        setSaveError(payload.error || "Não foi possível salvar o relatório.");
+        return;
+      }
+      setSavedOk(true);
+    } catch {
+      setSaveError("Erro de rede ao salvar o relatório.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const interventionItems = [
     { key: "Agente", data: data.conclusao.elementosIntervencao.agente },
@@ -65,6 +101,11 @@ export function AnalysisDashboard({ data, onReset }: AnalysisDashboardProps) {
     <>
       <div className="no-print mx-auto max-w-7xl px-4 py-6">
         {/* Top Bar */}
+        {saveError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-medium text-red-800">
+            {saveError}
+          </div>
+        )}
         <div className="mb-6 flex flex-col justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-xs lg:flex-row lg:items-center">
           <div className="flex items-start gap-4">
             <button
@@ -127,6 +168,40 @@ export function AnalysisDashboard({ data, onReset }: AnalysisDashboardProps) {
               <Printer className="h-4 w-4 text-emerald-800" />
               Exportar Laudo PDF
             </button>
+
+            {userEmail ? (
+              savedOk ? (
+                <Link
+                  href="/relatorios"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-700/20 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  <FolderHeart className="h-4 w-4" />
+                  Salvo • Ver Meus Relatórios
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSaveReport}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <BookmarkPlus className="h-4 w-4" />
+                  )}
+                  Salvar na Conta
+                </button>
+              )
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-800/30 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-100"
+              >
+                <BookmarkPlus className="h-4 w-4" />
+                Entrar para Salvar
+              </Link>
+            )}
 
             <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-900 px-5 py-2.5 text-white shadow-sm">
               <Award className="h-6 w-6 text-emerald-300" />

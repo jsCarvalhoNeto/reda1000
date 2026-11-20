@@ -1,16 +1,23 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnalyzePayload, UploadPanel } from "@/components/UploadPanel";
 import { AnalysisDashboard } from "@/components/AnalysisDashboard";
 import { EssayAnalysisResult } from "@/types/essay";
 import { DEMO_ESSAYS } from "@/lib/demo-data";
 import { DEFAULT_AI_SETTINGS, loadAISettings } from "@/lib/settings";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
-export default function HomePage() {
+function HomeContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(DEFAULT_AI_SETTINGS.model);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<EssayAnalysisResult | null>(null);
+  const [openedFromSaved, setOpenedFromSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,11 +25,75 @@ export default function HomePage() {
     const settings = loadAISettings();
     setApiKey(settings.apiKey);
     setModel(settings.model);
+
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data }) => {
+        setUserEmail(data.user?.email ?? null);
+      });
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUserEmail(session?.user?.email ?? null);
+      });
+
+      return () => subscription.unsubscribe();
+    }
   }, []);
+
+  // Carrega relatório salvo quando acessado via /?relatorio=<id>
+  useEffect(() => {
+    const reportId = searchParams.get("relatorio");
+    const shouldPrint = searchParams.get("print") === "1";
+
+    if (!reportId) return;
+
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    fetch(`/api/relatorios/${encodeURIComponent(reportId)}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Não foi possível abrir o relatório.");
+        }
+        return data.relatorio;
+      })
+      .then((relatorio) => {
+        if (cancelled) return;
+        setAnalysis(relatorio.resultado as EssayAnalysisResult);
+        setOpenedFromSaved(true);
+        if (shouldPrint) {
+          setTimeout(() => window.print(), 350);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Erro ao carregar relatório.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
+  const handleSignOut = async () => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUserEmail(null);
+    router.refresh();
+  };
 
   const handleAnalyze = async ({ file, texto, tema }: AnalyzePayload) => {
     setIsLoading(true);
     setError(null);
+    setOpenedFromSaved(false);
 
     try {
       const currentSettings = loadAISettings();
@@ -60,22 +131,54 @@ export default function HomePage() {
 
   const handleLoadDemo = (demoKey: "sus840" | "pufendorf960") => {
     setError(null);
+    setOpenedFromSaved(false);
     setAnalysis(DEMO_ESSAYS[demoKey]);
   };
 
+  const handleReset = () => {
+    setAnalysis(null);
+    setOpenedFromSaved(false);
+    if (searchParams.get("relatorio")) {
+      router.push("/");
+    }
+  };
+
   if (analysis) {
-    return <AnalysisDashboard data={analysis} onReset={() => setAnalysis(null)} />;
+    return (
+      <AnalysisDashboard
+        data={analysis}
+        userEmail={userEmail}
+        alreadySaved={openedFromSaved}
+        onReset={handleReset}
+      />
+    );
   }
 
   return (
     <main className="min-h-screen">
       <UploadPanel
         apiConfigured={Boolean(apiKey.trim())}
+        userEmail={userEmail}
+        onSignOut={handleSignOut}
         onAnalyze={handleAnalyze}
         onLoadDemo={handleLoadDemo}
         isLoading={isLoading}
         error={error}
       />
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-sm text-stone-600">
+          Carregando Redação 1000...
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }

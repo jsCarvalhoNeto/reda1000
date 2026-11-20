@@ -192,7 +192,7 @@ function HomeContent() {
   return (
     <main className="min-h-screen">
       <UploadPanel
-        apiConfigured={Boolean(apiKey.trim())}
+        apiConfigured={Boolean(apiKey.trim()) || Boolean(userEmail)}
         userEmail={userEmail}
         onSignOut={handleSignOut}
         onAnalyze={handleAnalyze}

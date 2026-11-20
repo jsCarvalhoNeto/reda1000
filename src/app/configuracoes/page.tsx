@@ -186,10 +186,10 @@ export default function ConfiguracoesPage() {
                     className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
                       apiKey.trim()
                         ? "bg-emerald-100 text-emerald-800"
-                        : "bg-amber-100 text-amber-800"
+                        : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
                     }`}
                   >
-                    {apiKey.trim() ? "Chave ativa" : "Não configurada"}
+                    {apiKey.trim() ? "Chave personalizada ativa" : "Padrão do sistema ativo"}
                   </span>
                 </div>
 
@@ -251,16 +251,16 @@ export default function ConfiguracoesPage() {
                       type="text"
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
-                      placeholder="Ex.: gemini-2.5-flash"
+                      placeholder="Ex.: gemini-4-hydrogen"
                       className="w-full rounded-xl border border-stone-300 bg-stone-50 px-4 py-2.5 font-mono text-sm text-stone-900 outline-none transition focus:border-emerald-700 focus:bg-white"
                     />
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <span className="text-[11px] text-stone-500">Sugestões rápidas:</span>
                       {[
+                        "gemini-4-hydrogen",
                         "gemini-2.5-flash",
                         "gemini-2.5-pro",
                         "gemini-2.5-flash-lite",
-                        "gemini-2.0-flash",
                       ].map((preset) => (
                         <button
                           key={preset}

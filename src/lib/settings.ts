@@ -10,7 +10,7 @@ export const STORAGE_MODEL_KEY = "redacao1000_gemini_model";
 export const DEFAULT_AI_SETTINGS: AISettings = {
   provider: "gemini",
   apiKey: "",
-  model: "gemini-2.5-flash",
+  model: "gemini-4-hydrogen",
 };
 
 export function loadAISettings(): AISettings {

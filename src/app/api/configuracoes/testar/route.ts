@@ -1,11 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveServerAIConfig } from "@/lib/server-ai-config";
+import {
+  createServerSupabaseClient,
+  isSupabaseServerConfigured,
+} from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const clientApiKey = (body?.apiKey as string | undefined)?.trim() || "";
-    const model = (body?.model as string | undefined)?.trim() || "gemini-2.5-flash";
-    const apiKey = clientApiKey || process.env.GEMINI_API_KEY || "";
+    const clientModel = (body?.model as string | undefined)?.trim() || "";
+    const { apiKey, model, usingServerDefaultKey } = resolveServerAIConfig(
+      clientApiKey,
+      clientModel
+    );
+
+    if (usingServerDefaultKey && isSupabaseServerConfigured()) {
+      const supabase = await createServerSupabaseClient();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        return NextResponse.json(
+          { ok: false, error: "Faça login para testar a conexão com a API padrão do servidor." },
+          { status: 401 }
+        );
+      }
+    }
 
     if (!apiKey) {
       return NextResponse.json(

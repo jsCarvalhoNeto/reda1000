@@ -5,6 +5,7 @@ import {
   createServerSupabaseClient,
   isSupabaseServerConfigured,
 } from "@/lib/supabase/server";
+import { resolveServerAIConfig } from "@/lib/server-ai-config";
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -38,12 +39,8 @@ export async function POST(request: NextRequest) {
     const texto = (formData.get("texto") as string | null)?.trim() || "";
     const tema = (formData.get("tema") as string | null)?.trim() || "";
     const clientApiKey = (formData.get("apiKey") as string | null)?.trim() || "";
-    const model =
-      (formData.get("model") as string | null)?.trim() ||
-      process.env.GEMINI_MODEL ||
-      "gemini-2.5-flash";
-
-    const apiKey = clientApiKey || process.env.GEMINI_API_KEY || "";
+    const clientModel = (formData.get("model") as string | null)?.trim() || "";
+    const { apiKey, model } = resolveServerAIConfig(clientApiKey, clientModel);
 
     if (!apiKey) {
       return NextResponse.json(

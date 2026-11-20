@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Upload,
@@ -15,7 +15,10 @@ import {
   FolderHeart,
   LogIn,
   LogOut,
+  Camera,
+  RotateCcw,
 } from "lucide-react";
+import { CameraCapture } from "@/components/CameraCapture";
 
 export interface AnalyzePayload {
   file?: File | null;
@@ -33,7 +36,7 @@ interface UploadPanelProps {
   error: string | null;
 }
 
-type InputMode = "file" | "text";
+type InputMode = "file" | "camera" | "text";
 
 export function UploadPanel({
   apiConfigured,
@@ -52,6 +55,14 @@ export function UploadPanel({
   const [tema, setTema] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const handleFileSelect = (file: File | undefined) => {
     if (!file) return;
     setSelectedFile(file);
@@ -61,6 +72,11 @@ export function UploadPanel({
     } else {
       setPreviewUrl(null);
     }
+  };
+
+  const handleClearFile = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -75,13 +91,13 @@ export function UploadPanel({
     ? essayText.trim().split(/\n\s*\n/).filter((p) => p.trim().length > 0).length
     : 0;
 
-  const canSubmit =
-    inputMode === "file" ? Boolean(selectedFile) : essayText.trim().length >= 50;
+  const isFileOrCameraMode = inputMode === "file" || inputMode === "camera";
+  const canSubmit = isFileOrCameraMode ? Boolean(selectedFile) : essayText.trim().length >= 50;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    if (inputMode === "file") {
+    if (isFileOrCameraMode) {
       await onAnalyze({ file: selectedFile, tema });
     } else {
       await onAnalyze({ texto: essayText, tema });
@@ -173,6 +189,18 @@ export function UploadPanel({
           </button>
           <button
             type="button"
+            onClick={() => setInputMode("camera")}
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition sm:text-sm ${
+              inputMode === "camera"
+                ? "bg-white text-emerald-900 shadow-xs"
+                : "text-stone-600 hover:text-stone-900"
+            }`}
+          >
+            <Camera className="h-4 w-4" />
+            Tirar Foto
+          </button>
+          <button
+            type="button"
             onClick={() => setInputMode("text")}
             className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition sm:text-sm ${
               inputMode === "text"
@@ -237,17 +265,64 @@ export function UploadPanel({
                 <p className="mt-1.5 text-xs text-stone-500">
                   Suporta fotos manuscritas/digitadas (JPG, PNG, WebP) ou documentos PDF até 20 MB
                 </p>
-                <div className="mt-4 flex items-center gap-3 text-xs text-stone-500">
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-stone-500">
                   <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 shadow-2xs ring-1 ring-stone-200">
                     <ImageIcon className="h-3.5 w-3.5 text-emerald-700" /> Imagem
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 shadow-2xs ring-1 ring-stone-200">
                     <FileText className="h-3.5 w-3.5 text-emerald-700" /> PDF
                   </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInputMode("camera");
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-900/10 px-2.5 py-1 font-semibold text-emerald-900 shadow-2xs ring-1 ring-emerald-800/20 transition hover:bg-emerald-900/15"
+                  >
+                    <Camera className="h-3.5 w-3.5 text-emerald-800" /> Tirar foto agora
+                  </button>
                 </div>
               </>
             )}
           </div>
+        ) : inputMode === "camera" ? (
+          selectedFile && previewUrl ? (
+            <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-emerald-600/50 bg-emerald-50/20 px-6 py-8 text-center">
+              <img
+                src={previewUrl}
+                alt="Foto capturada da redação"
+                className="mb-4 max-h-72 rounded-xl border border-stone-200 object-contain shadow-xs"
+              />
+              <p className="text-sm font-semibold text-stone-900">{selectedFile.name}</p>
+              <p className="mt-0.5 text-xs text-stone-500">
+                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Pronta para análise
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleClearFile}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-700 shadow-2xs transition hover:bg-stone-50"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Tirar outra foto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode("file")}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-700 shadow-2xs transition hover:bg-stone-50"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Escolher arquivo
+                </button>
+              </div>
+            </div>
+          ) : (
+            <CameraCapture
+              onCapture={(file) => handleFileSelect(file)}
+              onCancel={() => setInputMode("file")}
+            />
+          )
         ) : (
           <div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

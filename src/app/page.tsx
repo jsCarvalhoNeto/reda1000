@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnalyzePayload, UploadPanel } from "@/components/UploadPanel";
 import { AnalysisDashboard } from "@/components/AnalysisDashboard";
+import { LandingPage } from "@/components/LandingPage";
 import { EssayAnalysisResult } from "@/types/essay";
 import { DEMO_ESSAYS } from "@/lib/demo-data";
 import { DEFAULT_AI_SETTINGS, loadAISettings } from "@/lib/settings";
@@ -16,6 +17,7 @@ function HomeContent() {
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(DEFAULT_AI_SETTINGS.model);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [analysis, setAnalysis] = useState<EssayAnalysisResult | null>(null);
   const [openedFromSaved, setOpenedFromSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,20 +28,28 @@ function HomeContent() {
     setApiKey(settings.apiKey);
     setModel(settings.model);
 
-    if (isSupabaseConfigured()) {
-      const supabase = createClient();
-      supabase.auth.getUser().then(({ data }) => {
-        setUserEmail(data.user?.email ?? null);
-      });
-
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, session) => {
-        setUserEmail(session?.user?.email ?? null);
-      });
-
-      return () => subscription.unsubscribe();
+    if (!isSupabaseConfigured()) {
+      setAuthChecked(true);
+      return;
     }
+
+    const supabase = createClient();
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        setUserEmail(data.user?.email ?? null);
+      })
+      .finally(() => {
+        setAuthChecked(true);
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Carrega relatório salvo quando acessado via /?relatorio=<id>
@@ -47,7 +57,7 @@ function HomeContent() {
     const reportId = searchParams.get("relatorio");
     const shouldPrint = searchParams.get("print") === "1";
 
-    if (!reportId) return;
+    if (!reportId || !userEmail) return;
 
     let cancelled = false;
     setIsLoading(true);
@@ -80,17 +90,23 @@ function HomeContent() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
+  }, [searchParams, userEmail]);
 
   const handleSignOut = async () => {
     if (!isSupabaseConfigured()) return;
     const supabase = createClient();
     await supabase.auth.signOut();
     setUserEmail(null);
+    setAnalysis(null);
     router.refresh();
   };
 
   const handleAnalyze = async ({ file, texto, tema }: AnalyzePayload) => {
+    if (!userEmail) {
+      setError("Faça login para realizar a análise da redação.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setOpenedFromSaved(false);
@@ -142,6 +158,25 @@ function HomeContent() {
       router.push("/");
     }
   };
+
+  if (!authChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f6f2] text-sm text-stone-600">
+        Verificando sessão...
+      </div>
+    );
+  }
+
+  // Sem usuário logado -> exibe a Landing Page com área de Login antes da submissão
+  if (!userEmail) {
+    return (
+      <LandingPage
+        onAuthSuccess={() => {
+          router.refresh();
+        }}
+      />
+    );
+  }
 
   if (analysis) {
     return (

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ENEM_RESPONSE_SCHEMA, ENEM_SYSTEM_PROMPT } from "@/lib/enem-prompt";
 import { EssayAnalysisResult } from "@/types/essay";
+import {
+  createServerSupabaseClient,
+  isSupabaseServerConfigured,
+} from "@/lib/supabase/server";
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -14,6 +18,21 @@ const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export async function POST(request: NextRequest) {
   try {
+    if (isSupabaseServerConfigured()) {
+      const supabase = await createServerSupabaseClient();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        return NextResponse.json(
+          { error: "Acesso negado. Faça login para analisar redações." },
+          { status: 401 }
+        );
+      }
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
     const texto = (formData.get("texto") as string | null)?.trim() || "";
